@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bank Transfer System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar"><h1>Bank Transfer System</h1></header>
+<main>
+    <div th:if="${success}" class="msg ok" th:text="${success}"></div>
+    <div th:if="${error}" class="msg err" th:text="${error}"></div>
+
+    <section class="stats">
+        <div>Customers: <b th:text="${customerCount}"></b></div>
+        <div>Total balance: <b th:text="${#numbers.formatDecimal(totalBalance,1,'COMMA',2,'POINT')}"></b></div>
+        <div>SUCCESS: <b th:text="${successCount}"></b></div>
+        <div>FAILED: <b th:text="${failedCount}"></b></div>
+    </section>
+
+    <section>
+        <h2>Customers</h2>
+        <form th:action="@{/}" method="get">
+            <input type="text" name="keyword" th:value="${keyword}" placeholder="Search by name">
+            <button type="submit">Search</button>
+        </form>
+        <table>
+            <tr><th>Account</th><th>Name</th><th>Email</th><th>Balance</th><th></th></tr>
+            <tr th:each="c : ${customers}">
+                <td th:text="${c.accountNumber}"></td>
+                <td th:text="${c.fullName}"></td>
+                <td th:text="${c.email}"></td>
+                <td th:text="${#numbers.formatDecimal(c.balance,1,'COMMA',2,'POINT')}"></td>
+                <td><a th:href="@{/accounts/{a}/history(a=${c.accountNumber})}">View</a></td>
+            </tr>
+        </table>
+    </section>
+
+    <section>
+        <h2>Add Customer</h2>
+        <form th:action="@{/customers}" method="post">
+            <input name="accountNumber" placeholder="Account number" required>
+            <input name="fullName" placeholder="Full name" required>
+            <input name="email" type="email" placeholder="Email" required>
+            <input name="balance" type="number" step="0.01" min="0" placeholder="Opening balance" required>
+            <button type="submit">Add</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>Transfer Money</h2>
+        <form th:action="@{/transfer}" th:object="${transferRequest}" method="post">
+            <div><input th:field="*{fromAccount}" placeholder="From account">
+                 <span class="fe" th:errors="*{fromAccount}"></span></div>
+            <div><input th:field="*{toAccount}" placeholder="To account">
+                 <span class="fe" th:errors="*{toAccount}"></span></div>
+            <div><input th:field="*{amount}" placeholder="Amount">
+                 <span class="fe" th:errors="*{amount}"></span></div>
+            <label><input type="checkbox" th:field="*{simulateFailure}"> Simulate a system failure</label>
+            <button type="submit">Transfer</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>Latest Transactions</h2>
+        <table>
+            <tr><th>ID</th><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Description</th><th>Time</th></tr>
+            <tr th:each="t : ${transactions}">
+                <td th:text="${t.id}"></td>
+                <td th:text="${t.fromAccount}"></td>
+                <td th:text="${t.toAccount}"></td>
+                <td th:text="${t.amount}"></td>
+                <td th:text="${t.status}" th:class="${t.status.name() == 'SUCCESS'} ? 'ok-t' : 'err-t'"></td>
+                <td th:text="${t.description}"></td>
+                <td th:text="${#temporals.format(t.createdAt,'yyyy-MM-dd HH:mm:ss')}"></td>
+            </tr>
+        </table>
+    </section>
+</main>
+</body>
+</html>

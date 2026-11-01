@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Account History</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar"><h1>Account History</h1></header>
+<main>
+    <p><a th:href="@{/}">&larr; Back to dashboard</a></p>
+    <h2><span th:text="${customer.fullName}"></span> (<span th:text="${customer.accountNumber}"></span>)</h2>
+    <p>Balance: <b th:text="${#numbers.formatDecimal(customer.balance,1,'COMMA',2,'POINT')}"></b></p>
+    <table>
+        <tr><th>ID</th><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Description</th><th>Time</th></tr>
+        <tr th:each="t : ${transactions}">
+            <td th:text="${t.id}"></td>
+            <td th:text="${t.fromAccount}"></td>
+            <td th:text="${t.toAccount}"></td>
+            <td th:text="${t.amount}"></td>
+            <td th:text="${t.status}"></td>
+            <td th:text="${t.description}"></td>
+            <td th:text="${#temporals.format(t.createdAt,'yyyy-MM-dd HH:mm:ss')}"></td>
+        </tr>
+    </table>
+</main>
+</body>
+</html>
