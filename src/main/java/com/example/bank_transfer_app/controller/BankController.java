@@ -25,7 +25,7 @@ public class BankController {
     private final BankService bankService;
     private final TransactionAuditService auditService;
 
-    // Dashboard එකට data load කරන common method එක
+    
     private void loadDashboard(Model model, String keyword) {
         model.addAttribute("customers", bankService.getCustomers(keyword));
         model.addAttribute("keyword", keyword);
@@ -62,7 +62,7 @@ public class BankController {
     public String transfer(@Valid @ModelAttribute("transferRequest") TransferRequest req,
                            BindingResult result, Model model, RedirectAttributes ra) {
 
-        // Bean validation errors: DB එකට යන්නේ නැහැ, FAILED row එකකුත් නැහැ
+        
         if (result.hasErrors()) {
             loadDashboard(model, null);
             return "bank";
@@ -73,8 +73,7 @@ public class BankController {
                                  req.getAmount(), req.isSimulateFailure());
             ra.addFlashAttribute("success", "Transfer of " + req.getAmount() + " completed");
         } catch (Exception e) {
-            // transfer() දැනටමත් rollback වෙලා.
-            // දැන් FAILED record එක වෙනම transaction එකකින් save කරනවා.
+            
             auditService.recordFailure(req.getFromAccount(), req.getToAccount(),
                                        req.getAmount(), e.getMessage());
             ra.addFlashAttribute("error", e.getMessage() + ". All changes were rolled back.");
@@ -88,10 +87,52 @@ public class BankController {
         try {
             model.addAttribute("customer", bankService.getCustomer(accountNumber));
             model.addAttribute("transactions", bankService.getHistory(accountNumber));
+
+            //------
+                model.addAttribute("totalSent", bankService.getTotalSent(accountNumber));
+
+
             return "history";
         } catch (Exception e) {
             ra.addFlashAttribute("error", e.getMessage());
             return "redirect:/";
         }
+    }
+
+    //----
+        @GetMapping("/large-transfers")
+    public String largeTransfers(@RequestParam(defaultValue = "10000") BigDecimal min,
+                                 Model model) {
+        model.addAttribute("min", min);
+        model.addAttribute("transactions", bankService.getLargeTransfers(min));
+        return "large-transfers";
+    }
+
+        @PostMapping("/deposit")
+    public String deposit(@RequestParam String account,
+                          @RequestParam BigDecimal amount,
+                          RedirectAttributes ra) {
+        try {
+            bankService.deposit(account, amount);
+            ra.addFlashAttribute("success", "Deposited " + amount + " to " + account);
+        } catch (Exception e) {
+            auditService.recordFailure(null, account, amount, e.getMessage());
+            ra.addFlashAttribute("error", e.getMessage() + ". All changes were rolled back.");
+        }
+        return "redirect:/";
+    }
+
+    @PostMapping("/withdraw")
+    public String withdraw(@RequestParam String account,
+                           @RequestParam BigDecimal amount,
+                           RedirectAttributes ra) {
+        try {
+            bankService.withdraw(account, amount);
+            ra.addFlashAttribute("success", "Withdrew " + amount + " from " + account);
+        } catch (Exception e) {
+            auditService.recordFailure(account, null, amount, e.getMessage());
+            ra.addFlashAttribute("error", e.getMessage() + ". All changes were rolled back.");
+        }
+        return "redirect:/";
     }
 }
