@@ -1,6 +1,6 @@
 package com.example.bank_transfer_app.service;
 
-
+import java.math.RoundingMode;
 import com.example.bank_transfer_app.exception.AccountNotFoundException;
 import com.example.bank_transfer_app.exception.BankException;
 import com.example.bank_transfer_app.exception.InsufficientBalanceException;
@@ -16,15 +16,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+
+
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)   // default: හැම method එකක්ම read-only
+@Transactional(readOnly = true)   
 public class BankService {
 
     private final CustomerRepository customerRepo;
     private final BankTransactionRepository txRepo;
 
-    // ---------- Read-only methods ----------
+  
 
     public List<Customer> getCustomers(String keyword) {
         if (keyword == null || keyword.isBlank()) {
@@ -41,7 +43,7 @@ public class BankService {
 
     public BigDecimal getTotalBalance() {
         BigDecimal total = customerRepo.getTotalBalance();
-        return total == null ? BigDecimal.ZERO : total;   // customers නැත්නම් null
+        return total == null ? BigDecimal.ZERO : total;   
     }
 
     public long getCustomerCount() {
@@ -60,9 +62,15 @@ public class BankService {
         return txRepo.countByStatus(status);
     }
 
-    // ---------- Write methods ----------
+    //------
 
-    @Transactional   // read-write
+        public List<BankTransaction> getLargeTransfers(BigDecimal min) {
+        return txRepo.findLargeTransfers(min);
+    }
+
+   
+
+    @Transactional  
     public Customer createCustomer(String accountNumber, String fullName,
                                    String email, BigDecimal balance) {
         if (customerRepo.countAccounts(accountNumber) > 0) {
@@ -74,15 +82,13 @@ public class BankService {
         return customerRepo.save(new Customer(accountNumber, fullName, email, balance));
     }
 
-    /**
-     * Lab එකේ හදවත: සියලු steps එකම transaction එකක්.
-     * ඕනෑම exception එකක් ආවොත් ඔක්කොම rollback වෙනවා.
-     */
-    @Transactional(rollbackFor = Exception.class)
+   
+     
+        @Transactional(rollbackFor = Exception.class)
     public BankTransaction transfer(String from, String to,
                                     BigDecimal amount, boolean simulateFailure) {
 
-        // Step 1: Validate
+        
         if (from.equals(to)) {
             throw new BankException("Sender and receiver must be different accounts");
         }
@@ -93,22 +99,59 @@ public class BankService {
             throw new AccountNotFoundException("Account " + to + " not found");
         }
 
-        // Step 2: Withdraw (balance මදි නම් 0 rows)
-        int rows = customerRepo.debit(from, amount);
+        
+
+        
+        BigDecimal fee = amount.multiply(new BigDecimal("0.01"))
+                               .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalDebit = amount.add(fee);
+
+      
+        int rows = customerRepo.debit(from, totalDebit);
         if (rows == 0) {
             throw new InsufficientBalanceException("Insufficient balance in account " + from);
         }
 
-        // Step 3: Experiment: withdraw කරලා ඉවර වුණාට පස්සේ crash එකක්
+        
         if (simulateFailure) {
             throw new BankException("Simulated system failure after the withdrawal");
         }
 
-        // Step 4: Deposit
+        
         customerRepo.credit(to, amount);
+        customerRepo.credit("999999", fee);
 
-        // Step 5: SUCCESS record එක save කරනවා
+        
         return txRepo.save(new BankTransaction(from, to, amount,
-                TransactionStatus.SUCCESS, "Transfer completed"));
+                TransactionStatus.SUCCESS, "Transfer completed (fee " + fee + ")"));
+    }
+
+    //-----
+        public BigDecimal getTotalSent(String account) {
+        return txRepo.sumSentByAccount(account, TransactionStatus.SUCCESS);
+    }
+    
+
+        @Transactional(rollbackFor = Exception.class)
+    public BankTransaction deposit(String account, BigDecimal amount) {
+        if (customerRepo.countAccounts(account) == 0) {
+            throw new AccountNotFoundException("Account " + account + " not found");
+        }
+        customerRepo.credit(account, amount);
+        return txRepo.save(new BankTransaction(null, account, amount,
+                TransactionStatus.SUCCESS, "Deposit"));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public BankTransaction withdraw(String account, BigDecimal amount) {
+        if (customerRepo.countAccounts(account) == 0) {
+            throw new AccountNotFoundException("Account " + account + " not found");
+        }
+        int rows = customerRepo.debit(account, amount);
+        if (rows == 0) {
+            throw new InsufficientBalanceException("Insufficient balance in account " + account);
+        }
+        return txRepo.save(new BankTransaction(account, null, amount,
+                TransactionStatus.SUCCESS, "Withdrawal"));
     }
 }

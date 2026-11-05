@@ -16,7 +16,7 @@ public class TransactionAuditService {
 
     private final BankTransactionRepository txRepo;
 
-    // REQUIRES_NEW: transfer() rollback වුණත් FAILED record එක වෙනම transaction එකක ඉතිරි වෙනවා
+    
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(String from, String to, BigDecimal amount, String reason) {
         txRepo.save(new BankTransaction(from, to, amount,
